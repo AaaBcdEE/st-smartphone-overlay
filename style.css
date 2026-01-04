@@ -1,0 +1,361 @@
+/* --- Root Vars (기존 유지) --- */
+:root {
+    --phone-w: 370px;
+    --phone-h: 750px;
+    --ph-bg-color: #000000;
+    --ph-text-color: #ffffff;
+    --ph-header-bg: rgba(30, 30, 30, 0.85);
+    --ph-panel-bg: rgba(28, 28, 30, 0.95);
+    --ph-input-bg: #1c1c1e;
+    --ph-input-text: #ffffff;
+    --ph-icon-color: #0a84ff;
+    --ph-msg-mine: #0a84ff;
+    --ph-msg-theirs: #262628;
+    --ph-app-icon-shadow: 0 4px 15px rgba(0,0,0,0.5);
+}
+
+#st-phone-overlay.light-mode {
+    --ph-bg-color: #f2f2f7;
+    --ph-text-color: #000000;
+    --ph-header-bg: rgba(255, 255, 255, 0.85);
+    --ph-panel-bg: rgba(255, 255, 255, 0.95);
+    --ph-input-bg: #ffffff;
+    --ph-input-text: #000000;
+    --ph-icon-color: #007aff;
+    --ph-msg-mine: #007aff;
+    --ph-msg-theirs: #e5e5ea;
+    --ph-app-icon-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+/* 기존 컨테이너 스타일 */
+#st-phone-overlay {
+    position: fixed; bottom: 20px; right: 20px;
+    width: var(--phone-w); height: var(--phone-h);
+    z-index: 20000;
+    transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: var(--ph-text-color);
+}
+.phone-hidden { transform: translateY(150px) scale(0.8); opacity: 0; pointer-events: none; }
+
+.phone-bezel {
+    width: 100%; height: 100%; background: #000;
+    border-radius: 56px; border: 6px solid #1a1a1a;
+    box-shadow: 0 0 0 2px #444, 0 25px 50px -12px rgba(0,0,0,0.8), inset 0 0 0 4px #000;
+    box-sizing: border-box; overflow: hidden; position: relative;
+}
+.phone-screen {
+    width: 100%; height: 100%; background-color: #000;
+    background-size: cover; background-position: center;
+    border-radius: 46px; overflow: hidden; position: relative; z-index: 1;
+}
+
+/* Status Bar & Nav */
+.phone-status-bar {
+    position: absolute; top: 5px; left: 0; width: 100%; padding: 0 26px; height: 44px;
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 15px; font-weight: 600; z-index: 100; color: inherit;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.3); pointer-events: none;
+}
+.phone-home-indicator {
+    position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); width: 134px; height: 5px;
+    background: var(--ph-text-color); border-radius: 100px; opacity: 0.4; z-index: 200; cursor: pointer; backdrop-filter: invert(1);
+}
+
+/* Apps container */
+.phone-app {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    background: var(--ph-bg-color);
+    display: flex; flex-direction: column; opacity: 0; pointer-events: none;
+    transform: scale(0.92); transition: 0.25s cubic-bezier(0.2, 0.8, 0.2, 1); z-index: 10;
+}
+.phone-app.active { opacity: 1; pointer-events: auto; transform: scale(1); z-index: 20; }
+#app-home { background: transparent !important; }
+
+/* Home Icon Grid */
+.app-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr); grid-auto-rows: min-content;
+    padding: 85px 22px 0 22px; gap: 30px 18px; box-sizing: border-box; justify-items: center;
+}
+.app-icon { display: block; cursor: pointer; transition: transform 0.1s; }
+.app-icon:active { transform: scale(0.9); opacity: 0.8; }
+.icon-bg {
+    width: 62px; height: 62px; border-radius: 15px; display: flex; align-items: center; justify-content: center;
+    font-size: 30px; color: white; box-shadow: var(--ph-app-icon-shadow);
+}
+.camera-bg { background: linear-gradient(135deg, #d4d4d8 0%, #71717a 100%); color: #18181b; }
+.album-bg { background: linear-gradient(135deg, #fbbf24 0%, #ea580c 100%); }
+.message-bg { background: linear-gradient(135deg, #4ade80 0%, #16a34a 100%); }
+.settings-bg { background: linear-gradient(135deg, #94a3b8 0%, #475569 100%); }
+
+/* Common Headers */
+.camera-header {
+    height: 94px; padding: 44px 15px 10px 15px; display: flex; align-items: center;
+    background: var(--ph-header-bg); backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px);
+    font-size: 17px; font-weight: 600; border-bottom: 0.5px solid rgba(128,128,128, 0.2);
+    box-sizing: border-box; flex-shrink: 0; z-index: 50; color: var(--ph-text-color);
+}
+.back-btn { background: none; border: none; color: var(--ph-icon-color); cursor: pointer; font-size: 18px; padding: 5px; display: flex; align-items: center; }
+
+/* --- Messages App --- */
+.msg-header-profile { display: flex; flex-direction: column; align-items: center; flex: 1; margin-right: 25px; }
+.msg-avatar { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; background: #555; cursor: pointer; border: 2px solid rgba(128,128,128,0.3); }
+.msg-name { font-size: 13px; margin-top: 2px; opacity: 0.9; cursor: pointer; }
+
+.msg-list {
+    flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 8px;
+    background: var(--ph-bg-color); scroll-behavior: smooth;
+    padding-bottom: 20px;
+}
+.msg-bubble {
+    max-width: 75%; padding: 10px 14px; border-radius: 18px; font-size: 15px;
+    line-height: 1.4; word-wrap: break-word; white-space: pre-wrap;
+    display: flex; flex-direction: column; gap: 5px; /* 이미지와 텍스트 사이 간격 */
+}
+.msg-bubble.mine { background: var(--ph-msg-mine); color: white; align-self: flex-end; border-bottom-right-radius: 4px; }
+.msg-bubble.theirs { background: var(--ph-msg-theirs); color: var(--ph-text-color); align-self: flex-start; border-bottom-left-radius: 4px; }
+
+/* Image in messages */
+.msg-image {
+    width: 100%; border-radius: 12px; cursor: pointer; display: block;
+    max-height: 300px; object-fit: cover;
+}
+
+/* Input Area */
+.msg-input-area {
+    padding: 10px 15px 30px 15px;
+    background: var(--ph-panel-bg); backdrop-filter: blur(20px);
+    border-top: 0.5px solid rgba(128,128,128, 0.2);
+    display: flex; gap: 10px; align-items: flex-end;
+    flex-shrink: 0; min-height: 60px;
+}
+.msg-attach-btn {
+    background: #8e8e93; color: white; border: none; width: 34px; height: 34px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center; font-size: 14px; cursor: pointer; flex-shrink: 0; margin-bottom: 4px;
+    transition: background 0.2s;
+}
+.msg-attach-btn:hover { background: #636366; }
+
+#msg-input-text {
+    flex: 1; background: var(--ph-input-bg); border: 1px solid rgba(128,128,128,0.3); border-radius: 20px;
+    padding: 10px 15px; color: var(--ph-text-color); font-size: 15px; outline: none; resize: none;
+    height: 40px; max-height: 120px; overflow-y: auto; font-family: inherit; line-height: 1.3;
+}
+.msg-send-btn {
+    background: var(--ph-icon-color); color: white; border: none; width: 36px; height: 36px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center; font-size: 14px; cursor: pointer; flex-shrink: 0; margin-bottom: 2px;
+}
+
+/* Photo Send Overlay */
+.msg-photo-overlay {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.7); backdrop-filter: blur(5px);
+    z-index: 100; display: flex; align-items: center; justify-content: center;
+}
+.msg-photo-box {
+    width: 80%; background: var(--ph-panel-bg); padding: 20px; border-radius: 20px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.5); border: 1px solid rgba(128,128,128,0.2);
+    display: flex; flex-direction: column; gap: 10px;
+}
+.msg-photo-title { font-size: 18px; font-weight: bold; margin-bottom: 5px; text-align: center; }
+#msg-photo-prompt {
+    width: 100%; background: var(--ph-input-bg); border: 1px solid #444; color: var(--ph-text-color);
+    padding: 10px; border-radius: 10px; font-size: 15px; outline: none; margin-bottom: 10px;
+}
+.msg-photo-actions { display: flex; justify-content: space-between; gap: 10px; }
+.msg-photo-actions button {
+    flex: 1; padding: 10px; border-radius: 10px; border: none; font-size: 15px; cursor: pointer; font-weight: 500;
+}
+#msg-photo-cancel { background: #3a3a3c; color: #fff; }
+#msg-photo-confirm { background: var(--ph-icon-color); color: #fff; }
+
+/* Camera View */
+.camera-viewport { flex: 1; background: #000; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative;}
+.camera-controls { background: var(--ph-panel-bg); padding: 20px 25px 45px 25px; display: flex; flex-direction: column; align-items: center; gap: 15px; }
+#camera-prompt { width: 100%; background: rgba(120,120,120,0.2); border: none; border-radius: 20px; padding: 12px 16px; color: var(--ph-text-color); text-align: center; }
+.shutter-btn { width: 68px; height: 68px; border-radius: 50%; background: #fff; border: 4px solid rgba(0,0,0,0.05); cursor: pointer; }
+
+/* Other Apps */
+.album-content { flex: 1; padding: 1px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; overflow-y: auto; background: var(--ph-bg-color);}
+.album-thumb { width: 100%; aspect-ratio: 1; object-fit: cover; cursor: pointer; }
+
+.settings-content { flex: 1; padding: 0 20px 40px 20px; overflow-y: auto; }
+.settings-group { margin-top: 25px; background: var(--ph-input-bg); border-radius: 12px; overflow: hidden; }
+.settings-row { padding: 15px; border-bottom: 0.5px solid rgba(128,128,128,0.2); display: flex; justify-content: space-between; align-items: center; }
+.settings-row:last-child { border-bottom: none; }
+.settings-label-text { font-size: 15px; color: var(--ph-text-color); }
+.settings-action { color: var(--ph-icon-color); font-size: 15px; cursor: pointer; display:flex; align-items:center; }
+.settings-area-group { margin-top: 20px; }
+.settings-area-label { font-size: 12px; color: #888; margin-bottom: 5px; margin-left: 10px; text-transform: uppercase; }
+textarea.settings-input { width: 100%; background: var(--ph-input-bg); color: var(--ph-input-text); border: none; padding: 15px; border-radius: 12px; resize: none; }
+.photo-bg-black { background-color: #000; justify-content:center; }
+
+/* --- 연락처(Contacts) 앱 스타일 --- */
+.contact-bg { background: linear-gradient(135deg, #81c784 0%, #2e7d32 100%); }
+
+.contact-list { padding: 10px 15px; }
+.contact-item {
+    display: flex; align-items: center; background: var(--ph-input-bg);
+    padding: 10px; border-radius: 12px; margin-bottom: 10px; cursor: pointer;
+    border: 1px solid rgba(128,128,128,0.2);
+}
+.contact-item-avatar {
+    width: 44px; height: 44px; border-radius: 50%; object-fit: cover; margin-right: 15px; background: #555;
+}
+.contact-item-info { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.contact-item-name { font-size: 16px; font-weight: 600; color: var(--ph-text-color); }
+.contact-item-desc { font-size: 12px; color: #888; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 200px; }
+
+.fab-add {
+    position: absolute; bottom: 30px; right: 25px;
+    width: 56px; height: 56px; border-radius: 50%; background: var(--ph-icon-color);
+    color: white; border: none; font-size: 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+}
+
+/* 연락처 편집 폼 */
+.edit-form-group { margin-bottom: 20px; }
+.edit-label { display: block; font-size: 13px; color: #aaa; margin-bottom: 8px; margin-left: 5px;}
+.edit-input, .edit-textarea {
+    width: 100%; background: var(--ph-input-bg); color: var(--ph-text-color);
+    border: 1px solid rgba(128,128,128,0.3); border-radius: 10px; padding: 12px;
+    box-sizing: border-box; font-size: 15px; outline: none;
+}
+.edit-textarea { height: 80px; resize: none; }
+.edit-btn-save {
+    width: 100%; padding: 14px; background: var(--ph-icon-color); color: white;
+    border: none; border-radius: 14px; font-size: 16px; font-weight: bold; cursor: pointer;
+}
+/* --- 채팅 목록(Thread List) 스타일 --- */
+.msg-thread-item {
+    display: flex; align-items: center; background: transparent;
+    padding: 12px 5px; border-bottom: 0.5px solid rgba(128,128,128,0.2);
+    cursor: pointer;
+}
+.msg-thread-item:active { background: rgba(128,128,128,0.1); }
+
+.thread-avatar {
+    width: 50px; height: 50px; border-radius: 50%; object-fit: cover; margin-right: 15px; background: #333;
+}
+.thread-info { flex: 1; min-width: 0; }
+.thread-top { display: flex; justify-content: space-between; margin-bottom: 4px; }
+.thread-name { font-size: 16px; font-weight: 600; color: var(--ph-text-color); }
+.thread-time { font-size: 13px; color: #888; }
+.thread-preview { font-size: 14px; color: #aaa; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* --- [긴급 수정] 화면 뚫고 나오는 현상 방지 --- */
+#app-contacts, #app-contact-edit, #app-message-list {
+    border-radius: 46px;  /* 폰 화면 둥글기에 맞춰 모서리 깎기 */
+    overflow: hidden;     /* 둥근 부분 밖으로 튀어나온 내용 잘라내기 */
+    box-sizing: border-box; /* 테두리 포함 크기 계산 */
+
+    /* 위치 재확인 (혹시 모르니 고정) */
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+}
+
+/* --- 앱 알림 배지 (빨간 숫자) --- */
+.app-notification-badge {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 4px;
+    background-color: #ff3b30;
+    color: white;
+    font-size: 12px;
+    font-weight: bold;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+    z-index: 100;
+    pointer-events: none;
+    box-sizing: border-box;
+    font-family: -apple-system, sans-serif;
+}
+/* 숫자가 없으면 숨김 */
+.app-notification-badge:empty, .app-notification-badge.hidden {
+    display: none;
+}
+
+/* --- [완전판] 모바일 전용 스타일 (꽉 채우기 + 나가기 버튼) --- */
+@media screen and (max-width: 768px) {
+    /* 1. 폰 껍데기(화면을 감싸는 전체 틀) */
+    #st-phone-overlay {
+        width: 100vw !important;
+        height: 100vh !important;
+        top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important;
+        border-radius: 0 !important;
+        margin: 0 !important;
+        z-index: 20000 !important;
+        background: black !important; /* 혹시 모를 빈틈을 검은색으로 */
+    }
+
+    /* 2. 테두리 장식(베젤) 완전히 없애기 */
+    .phone-bezel {
+        border: none !important;
+        padding: 0 !important;
+        box-shadow: none !important;
+        background: transparent !important;
+        border-radius: 0 !important;
+    }
+
+    /* 3. 화면(스크린) 모서리 둥글기 제거 */
+    .phone-screen {
+        border-radius: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+    }
+
+    /* 4. 숨기기 애니메이션 */
+    #st-phone-overlay.phone-hidden {
+        display: none !important;
+    }
+
+    /* 5. 모바일 전용 닫기 버튼 보이기 */
+    #mobile-close-btn {
+        display: flex !important;
+    }
+}
+
+/* [수정된 모바일 버튼 스타일] PC에선 안 보이고 모바일에서만 우측 하단에 뜸 */
+#mobile-close-btn {
+    display: none; /* 기본 숨김 */
+}
+
+@media screen and (max-width: 768px) {
+    #mobile-close-btn {
+        display: flex !important;
+        position: absolute;
+        bottom: 25px;       /* 바닥에서 25px 띄움 */
+        right: 25px;        /* 오른쪽에서 25px 띄움 */
+        width: 45px;        /* 너비 */
+        height: 45px;       /* 높이 */
+        border-radius: 50%; /* 완전 원형 */
+        background-color: rgba(0, 0, 0, 0.5); /* 반투명 검정 배경 */
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        color: white;
+        z-index: 999999;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;    /* 아이콘 크기 */
+        cursor: pointer;
+        backdrop-filter: blur(4px);
+    }
+
+    /* 눌렀을 때 반응 */
+    #mobile-close-btn:active {
+        background-color: rgba(255, 0, 0, 0.6);
+        transform: scale(0.9);
+    }
+}
+/* [SMS 로그 숨김 처리] */
+/* 실제로는 채팅방에 존재하지만 유저 눈에는 안 보이게 합니다 */
+.st-phone-hidden-log {
+    display: none !important;
+}
