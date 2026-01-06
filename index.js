@@ -78,12 +78,12 @@ jQuery(async () => {
     setInterval(updateClock, 1000);
 });
 
-// =========================================================================
-// 2. 핵심 기능 함수들
-// =========================================================================
-
+/* ========================================================
+   [수정됨] 동적 요소 주입 (알림 배지 강제 생성 포함)
+   ======================================================== */
 function injectDynamicElements() {
     setTimeout(() => {
+        // 1. 카메라 버튼 (기존 기능)
         if ($('#msg-attach-btn').length === 0) {
             const $area = $('.msg-input-area');
             if($area.length) {
@@ -94,6 +94,8 @@ function injectDynamicElements() {
                 `);
             }
         }
+
+        // 2. 포토 오버레이 (기존 기능)
         if ($('#msg-photo-overlay').length === 0) {
             const $msgApp = $('#app-messages');
             if($msgApp.length) {
@@ -111,7 +113,9 @@ function injectDynamicElements() {
                 `);
             }
         }
-		  if ($('#mobile-close-btn').length === 0) {
+
+        // 3. 모바일 닫기 버튼 (기존 기능)
+        if ($('#mobile-close-btn').length === 0) {
             $('.phone-screen').append(`
                 <div id="mobile-close-btn">
                     <i class="fa-solid fa-power-off"></i>
@@ -119,8 +123,60 @@ function injectDynamicElements() {
             `);
         }
 
+        /* ▼▼▼ [핵심 추가] 메시지 앱 아이콘 위에 '알림 뱃지' 강제 부착 ▼▼▼ */
+        // 홈 화면의 메시지 앱 아이콘을 찾습니다. (onclick 속성에 'messages'가 포함된 녀석)
+        const $msgIconDiv = $('.app-icon[onclick*="messages"]');
+
+        // 아이콘은 있는데 뱃지가 아직 없다면? 만들어 붙인다!
+        if ($msgIconDiv.length > 0 && $msgIconDiv.find('#badge-messages').length === 0) {
+            // position:relative가 있어야 뱃지 위치가 꼬이지 않음
+            if($msgIconDiv.css('position') === 'static') {
+                $msgIconDiv.css('position', 'relative');
+            }
+            // 뱃지 HTML 추가
+            $msgIconDiv.append(`<div id="badge-messages" class="app-notification-badge hidden">0</div>`);
+
+            // 뱃지가 막 생겼으니 숫자 갱신 한 번 실행
+            if (typeof updateGlobalBadge === 'function') updateGlobalBadge();
+        }
+        /* ▲▲▲ [여기까지 추가됨] ▲▲▲ */
+
     }, 500);
+
+            /* ▼▼▼ [수신 화면(Incoming) 추가] ▼▼▼ */
+        if ($('#app-incoming').length === 0) {
+            // 통화 수신 화면 HTML 구조 생성
+            $('.phone-screen').append(`
+                <div id="app-incoming">
+                    <div class="incoming-info">
+                        <img id="incoming-avatar" class="incoming-avatar" src="">
+                        <div style="height:20px;"></div>
+                        <div id="incoming-status" class="incoming-status">Incoming Call...</div>
+                        <div id="incoming-name" class="incoming-name">Unknown</div>
+                    </div>
+                    <div class="incoming-actions">
+                        <!-- 거절 버튼 -->
+                        <div class="column" style="display:flex; flex-direction:column; align-items:center; gap:10px;">
+                             <button class="btn-incoming btn-decline" onclick="handleIncomingAction('decline')">
+                                <i class="fa-solid fa-phone-slash"></i>
+                             </button>
+                             <span style="font-size:12px; color:#aaa;">Decline</span>
+                        </div>
+
+                        <!-- 받기 버튼 -->
+                        <div class="column" style="display:flex; flex-direction:column; align-items:center; gap:10px;">
+                            <button class="btn-incoming btn-accept" onclick="handleIncomingAction('accept')">
+                                <i class="fa-solid fa-phone"></i>
+                            </button>
+                             <span style="font-size:12px; color:#aaa;">Accept</span>
+                        </div>
+                    </div>
+                </div>
+            `);
+        }
+
 }
+
 
 function exposeFunctions() {
     window.openApp = openApp;
@@ -267,6 +323,30 @@ function registerEventListeners() {
         saveSettingsDebounced(); // 즉시 저장
 
         toastr.success("모든 자동완성 연락처가 삭제되었습니다.\n저주는 풀렸습니다.");
+    });
+    // ▼▼▼ [수정된 입력 감지기] 확실하게 AI 호출하기 ▼▼▼
+    $(document).off('click', '#call-send-btn').on('click', '#call-send-btn', function() {
+        const text = $('#call-input-text').val().trim();
+        // 통화 상태인지 확인
+        if(text && currentCallContext.active) {
+            console.log("[SmartPhone] User input detected:", text); // 1. 여기서 찍혀야 함
+            $('#call-input-text').val(''); // 입력창 비우기
+            processCallTurn(text, false);  // AI 처리 시작
+        } else {
+             console.warn("[SmartPhone] Send ignored. Text:", text, "Active:", currentCallContext.active);
+        }
+    });
+
+    // 엔터키 연동
+    $(document).off('keydown', '#call-input-text').on('keydown', '#call-input-text', function(e) {
+        if (e.which === 13) {
+             e.preventDefault(); // 줄바꿈 방지
+             $('#call-send-btn').click();
+        }
+    });
+// 실리태번에서 유저가 메시지를 보낼 때마다 실행됨
+    eventSource.on(event_types.USER_MESSAGE_RENDERED, () => {
+        ensureCallPromptInjection();
     });
 
 }
@@ -994,16 +1074,28 @@ function renderAlbum() {
     });
 }
 
+/* ========================================================
+   [수정됨] 대화방 헤더 업데이트 (이미지 깨짐 해결)
+   ======================================================== */
 function updateContactHeader() {
     const contact = phoneState.contacts.find(c => c.id === activeContactId);
+
+    // 기본 프사 URL (위키미디어 공용 플레이스홀더)
+    const DEFAULT_AVATAR = 'https://upload.wikimedia.org/wikipedia/commons/7/7c/Profile_avatar_placeholder_large.png';
+
     if (contact) {
         $('#msg-contact-name').text(contact.name);
-        $('#msg-contact-avatar').attr('src', contact.avatar || '');
+
+        // 데이터는 있는데 src가 빈 문자열이거나 null이면 기본 이미지 사용
+        const imgSrc = (contact.avatar && contact.avatar.trim() !== '') ? contact.avatar : DEFAULT_AVATAR;
+        $('#msg-contact-avatar').attr('src', imgSrc);
     } else {
+        // 연락처 정보가 아예 없는 경우
         $('#msg-contact-name').text("Unknown");
-        $('#msg-contact-avatar').attr('src', '');
+        $('#msg-contact-avatar').attr('src', DEFAULT_AVATAR);
     }
 }
+
 
 function renameContact() {
     // 기본 파트너 이름 변경 (옵션)
@@ -1236,7 +1328,12 @@ window.renderContactList = function() {
 };
 
 
-// [index.js] > openContactEdit 함수 교체
+/* ==========================================
+   [수정됨] 연락처 편집 창 열기 (이미지 깨짐 방지)
+   ========================================== */
+
+// 공통으로 사용할 기본 프로필 이미지 주소
+const DEFAULT_AVATAR = 'https://upload.wikimedia.org/wikipedia/commons/7/7c/Profile_avatar_placeholder_large.png';
 
 window.openContactEdit = function(id = null) {
     openApp('contact-edit');
@@ -1245,23 +1342,35 @@ window.openContactEdit = function(id = null) {
     // 체크박스/입력창 초기화
     $('#edit-is-global').prop('checked', false);
 
+    // 1. 이미지가 깨지지 않도록 기본값 설정
+    let currentAvatar = DEFAULT_AVATAR;
+
     if (id) {
         const c = phoneState.contacts.find(x => x.id === id);
         if(c) {
             $('#edit-name').val(c.name);
             $('#edit-persona').val(c.persona);
             $('#edit-tags').val(c.tags);
-            $('#edit-avatar-preview').attr('src', c.avatar);
-            // ▼ 고정 여부 불러오기
+
+            // 저장된 아바타가 있으면 그 주소를, 없으면 기본 주소 사용
+            if (c.avatar && c.avatar.trim() !== '') {
+                currentAvatar = c.avatar;
+            }
+
+            // 고정 여부 불러오기
             $('#edit-is-global').prop('checked', c.isGlobal === true);
         }
     } else {
-        // 새 연락처 만들기
+        // 새 연락처 만들기 (빈 값으로 초기화)
         $('#edit-name').val('');
         $('#edit-persona').val('');
         $('#edit-tags').val('');
-        $('#edit-avatar-preview').attr('src', '');
+        // 새 연락처는 무조건 기본 이미지
+        currentAvatar = DEFAULT_AVATAR;
     }
+
+    // 2. 최종 이미지 적용 (이제 절대 비어있지 않음)
+    $('#edit-avatar-preview').attr('src', currentAvatar);
 };
 
 
@@ -1631,30 +1740,52 @@ window.attemptPhoneCall = async function(contactId) {
 };
 
 /* =========================================================================
-   [NEW] 대화 턴 처리 함수 (AI 자동 끊기 기능 추가됨)
+   [최종 수정] 대화 턴 처리 함수 (토큰 절약 버전 - 중복 제거)
    ========================================================================= */
+/* [수정됨] 대화 턴 처리 (가방에 넣어둔 이름 꺼내 쓰기) */
 async function processCallTurn(userText = null, isFirst = false) {
     if (!currentCallContext.active) return;
-    const contact = phoneState.contacts.find(c => c.id === currentCallContext.contactId);
-    const userName = phoneState.settings.userName || "User";
 
-    // A. 내 대사 처리
+    // 연락처에서 찾기 시도
+    let contact = phoneState.contacts.find(c => c.id === currentCallContext.contactId);
+
+    // 연락처에 없어도(null) 겁먹지 말고, 아까 가방에 넣어둔 이름을 쓴다.
+    if (!contact) {
+        contact = {
+            name: currentCallContext.displayName || "Unknown",
+            persona: "Calm voice",
+            id: "temp"
+        };
+    }
+
+    const userName = phoneState.settings.userName || "User";
+    const userPersona = phoneState.settings.userPersona || "Average User";
+
+    // A. 내 대사 처리 (화면 표시 + 채팅창에 저장)
     if (userText) {
         $('#call-message-area').text(`(You): ${userText}`).show();
         $('#call-user-input-area').hide();
-        currentCallContext.history.push(`${userName}: ${userText}`);
-        // 채팅 로그에 내 이름 박기
+
+        // 1. 여기서 채팅창(Context)에 이미 저장됨!
         addHiddenLog(userName, `(${userName} on Phone): ${userText}`);
+
+        // 화면용 히스토리에는 남겨두되, 프롬프트에는 안 넣을 것임
+        currentCallContext.history.push(`${userName}: ${userText}`);
     }
 
-    // B. AI에게 보낼 프롬프트 구성
+    // B. 프롬프트 구성 (중복 제거)
     const context = getContext();
     let chatLog = "";
+
+    // 최근 대화 15줄 가져오기 (이미 여기에 방금 통화 내용이 포함되어 있음)
     if (context.chat && context.chat.length > 0) {
-        chatLog = context.chat.slice(-10).map(m => `${m.name}: ${m.mes}`).join('\n');
+        chatLog = context.chat.slice(-15).map(m => {
+            // 시스템 메시지나, 전화 로그 등 표시 형식을 맞춤
+            return `${m.name}: ${m.mes}`;
+        }).join('\n');
     }
 
-    const phoneLog = currentCallContext.history.join('\n');
+    // [삭제됨] phoneLog 변수 생성 및 주입 부분 제거 -> 토큰 절약!
 
     const instruction = isFirst
         ? `Decide to answer or not. If YES, answer naturally.`
@@ -1665,35 +1796,37 @@ async function processCallTurn(userText = null, isFirst = false) {
 You are playing the role of "${contact.name}".
 You are on a voice call with "${userName}".
 
+### Character Profile (Your Persona)
+Name: ${contact.name}
+Personality & Details: ${contact.persona}
+
+### Interlocutor (User) Profile
+Name: ${userName}
+Details: ${userPersona}  
+
 ### ⛔ STRICT PROHIBITIONS
-- NO Visual narration (e.g., *looks at phone*, *smiles*).
-- NO Novel style descriptions. You are invisible to the user.
+- NO Visual narration (e.g., *looks at phone*).
+- You are invisible. Output ONLY the spoken Dialogue.
 
 ### ✅ REQUIRED FORMAT
-- Output ONLY the spoken Dialogue.
 - Put sound effects/voice tone in parentheses ().
 
-### 🔌 ENDING THE CALL (CRITICAL)
-- If you want to hang up (bored, angry, or conversation over), add [HANGUP] at the end.
-- Example: "I'm done dealing with you. [HANGUP]"
-- Example: "Talk to you later. (click) [HANGUP]"
+### 🔌 ENDING THE CALL
+- If you want to hang up, add [HANGUP] at the end.
 
-### Chat Context
+### Chat Context (Recent History)
 ${chatLog}
-
-### Current Phone Log
-${phoneLog}
 
 ### Instructions
 ${instruction}
 
 ### Response Format (Strict JSON)
 {"answer": "YES", "text": "YOUR_DIALOGUE [HANGUP]"}
-(If hanging up, text MUST contain [HANGUP])
 `;
 
     // C. AI 생성
     try {
+        // 토큰 절약을 위해 max_length도 150으로 적당히 유지
         const result = await generateRaw(systemPrompt, null, { stop: ['}'], max_length: 150 });
 
         let decision = { answer: "YES", text: "..." };
@@ -1701,71 +1834,58 @@ ${instruction}
         if (jsonMatch) {
             try { decision = JSON.parse(jsonMatch[0]); } catch(e) {}
         } else {
-            // JSON 파싱 실패시 텍스트만 추출 시도
             decision.text = result.replace(/"/g, '');
         }
 
-        // D. 결과 처리
         const isConnected = decision.answer && decision.answer.toUpperCase().includes("YES");
 
         if (isConnected || !isFirst) {
             if(isFirst) {
                 $('#call-status').text('Connected').css('color', '#4ade80');
                 $('.call-avatar').css('animation-play-state', 'paused');
-                if (!phoneState.callHistory) phoneState.callHistory = [];
-                phoneState.callHistory.push({ contactId: contact.id, name: contact.name, type: 'outgoing', timestamp: Date.now() });
             }
 
-            // ▼▼▼ [핵심] 자동 끊기 감지 로직 ▼▼▼
             let aiText = decision.text;
             let shouldHangUp = false;
 
             if (aiText.includes('[HANGUP]')) {
                 shouldHangUp = true;
-                aiText = aiText.replace(/\[HANGUP\]/gi, '').trim(); // 태그는 화면에서 지워줌
+                aiText = aiText.replace(/\[HANGUP\]/gi, '').trim();
             }
 
-            // 로그 및 히스토리 저장
-            currentCallContext.history.push(`${contact.name}: ${aiText}`);
+            // AI 대사도 채팅창에 저장
             addHiddenLog(contact.name, `(${contact.name} on Phone): ${aiText} ${shouldHangUp ? '(Hung up)' : ''}`);
+            currentCallContext.history.push(`${contact.name}: ${aiText}`);
 
-            // 타이핑 효과 -> 끝나면 판단 (입력창 띄우기 vs 끊기)
             speakAndShow(aiText, () => {
-                                if (shouldHangUp) {
-                    // 1. AI가 끊음 -> 화면 연출
-                    $('.call-avatar').css('animation-play-state', 'paused'); // 사진 멈춤
-                    $('#call-status').text('Call Ended').css('color', '#ff3b30'); // 상태 메시지를 빨간색 'Call Ended'로
-
-                    // 2초 정도 멍하니 보여주다가 종료
-                    setTimeout(() => {
-                        forceEndCall();
-                    }, 2000);
+                if (shouldHangUp) {
+                    $('.call-avatar').css('animation-play-state', 'paused');
+                    $('#call-status').text('Call Ended').css('color', '#ff3b30');
+                    setTimeout(() => forceEndCall(), 2000);
                 } else {
-                    // 대화 계속
                     $('#call-user-input-area').fadeIn();
                     $('#call-input-text').val('').focus();
                 }
-
             });
 
         } else {
-            // 처음부터 전화를 거절한 경우
             $('#call-status').text('Call Declined').css('color', '#ff3b30');
             $('.call-avatar').css('animation-play-state', 'paused');
             $('#call-message-area').text(`(Refused: ${decision.text})`).fadeIn();
 
-            if (!phoneState.callHistory) phoneState.callHistory = [];
-            phoneState.callHistory.push({ contactId: contact.id, name: contact.name, type: 'missed', timestamp: Date.now() });
-            saveChatData();
+            // 거절 시에도 로그 남김 (선택사항)
+            addHiddenLog('System', `[Call Declined by ${contact.name}]: ${decision.text}`);
 
             setTimeout(() => { openApp('phone'); currentCallContext.active = false; }, 3000);
         }
 
     } catch (e) {
-        console.error(e);
+        console.error("Call Error:", e);
         $('#call-status').text('Error');
     }
 }
+
+
 
 
 // 3. 한 문장씩 보여주는 타이핑 효과 함수
@@ -1935,9 +2055,11 @@ window.forceEndCall = function() {
                      ? [...currentCallContext.history] // 내용 복사
                      : ["(No conversation)"];
 
-    const contactId = currentCallContext.contactId; // 누구랑 했는지
+    const contactId = currentCallContext.contactId; 
     const contact = phoneState.contacts.find(c => c.id === contactId);
-    const contactName = contact ? contact.name : "Unknown";
+
+// 연락처에 없으면 통화 중 화면에 표시됐던 이름(displayName)을 사용합니다.
+    const contactName = contact ? contact.name : (currentCallContext.displayName || "Unknown");
 
     // 1. 종료 처리
     currentCallContext.active = false;
@@ -2003,3 +2125,238 @@ window.showCallLog = function(timestamp) {
     $('.phone-app').removeClass('active'); // 다른 앱(전화 등) 숨김
     $('#app-voice-memo').addClass('active'); // 녹음 앱 열기
 };
+// =========================================================================
+// [NEW] AI가 거는 전화 감지 & 프롬프트 주입 모듈 (초보자용 통합팩)
+// =========================================================================
+let incomingCallTimer = null;
+let isRinging = false;
+
+async function ensureCallPromptInjection() {
+    const promptText = `[Phone Logic]
+If you want to initiate a voice call with User, append [call to user] at the very end of your response.
+NEVER decide the User's reaction or whether they pick up. Just generate the tag and stop.
+Wait for the system to process the call.`;
+
+    // 실리태번의 내부 명령어를 사용하여 AI 프롬프트에 직접 주입합니다.
+    if (SlashCommandParser.commands['inject']) {
+        try {
+            await SlashCommandParser.commands['inject'].callback({
+                id: 'st_phone_logic_v2', // 중복 방지를 위한 고유 ID
+                position: 'chat',        // 대화 내역(Chat) 사이에 주입
+                depth: 2,                // 유저 메시지 2칸 위에 위치 (Depth 2)
+                role: 'system'           // 시스템 메시지 형식으로 전달
+            }, promptText);
+            console.log("[SmartPhone] Phone Logic injected at Depth 2");
+        } catch (e) {
+            console.error("[SmartPhone] Injection failed:", e);
+        }
+    }
+}
+
+
+
+
+// UI 업데이트가 될 때마다 주입 시도 (확실하게 하기 위해)
+const originalUpdateUIForCall = updateUI;
+updateUI = function() {
+    originalUpdateUIForCall();
+    ensureCallPromptInjection();
+};
+
+// 2. 채팅 감지 (AI 메시지에 [call to user]가 있는지 확인)
+(function() {
+    // 감시 대상 설정
+    const observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+            // A. 새로운 메시지 박스(.mes)가 화면에 추가되었을 때
+            mutation.addedNodes.forEach((node) => {
+                if (node.nodeType === 1 && node.classList.contains('mes')) {
+                    checkMessageForCallTag(node);
+                }
+            });
+
+            // B. 메시지 내용이 실시간으로 수정될 때 (스트리밍 중)
+            if (mutation.type === 'characterData' || mutation.type === 'childList') {
+                const target = mutation.target.parentElement?.closest('.mes');
+                if(target) checkMessageForCallTag(target);
+            }
+        });
+    });
+
+    // 감시 시작
+    function startMonitor() {
+        const chat = document.getElementById('chat');
+        if(chat) observer.observe(chat, { childList: true, subtree: true });
+        else setTimeout(startMonitor, 1000);
+    }
+    setTimeout(startMonitor, 2000);
+
+    // ★ 실제 검사 함수 (여기가 핵심 수정됨) ★
+    function checkMessageForCallTag(msgNode) {
+        if(msgNode.dataset.callChecked) return;
+
+        // [핵심 Fix] 오직 "최신 메시지(last_mes)"일 때만 전화를 걺!
+        // 옛날 메시지는 이 클래스가 없으므로 무시됨.
+        if (!msgNode.classList.contains('last_mes')) return;
+
+        const textDiv = msgNode.querySelector('.mes_text');
+        if(!textDiv) return;
+
+        const html = textDiv.innerHTML;
+
+        // 태그 검색 (대소문자 무시)
+        if (html.toLowerCase().includes('[call to user]')) {
+            msgNode.dataset.callChecked = "true";
+
+            // 1. 화면에서 태그 지워주기 (깔끔하게)
+            textDiv.innerHTML = html.replace(/\[call to user\]/gi, '').trim();
+
+            // 2. 전화 발신 처리 시작
+            console.log("Call trigger detected in the latest message.");
+            triggerIncomingCall();
+        }
+    }
+})();
+
+
+// 3. 전화 수신 로직 (Unknown 해결 버전)
+window.triggerIncomingCall = function() {
+    if(isRinging) return; // 이미 울리고 있으면 패스
+
+    // [Fix 1] 현재 대화중인 캐릭터 정보 확실하게 긁어오기
+    const context = getContext();
+    let realName = "Unknown";
+    let realAvatarRaw = "";
+
+    if (context.characters && context.characters.length > 0) {
+        // 현재 선택된 캐릭터 ID (없으면 0번)
+        const charId = context.characterId !== undefined ? context.characterId : 0;
+        const charObj = context.characters[charId];
+        if (charObj) {
+            realName = charObj.name;
+            realAvatarRaw = charObj.avatar;
+        }
+    }
+
+    // 아바타 경로 보정 (http로 시작 안하면 로컬 경로 붙임)
+    let displayAvatar = 'https://upload.wikimedia.org/wikipedia/commons/7/7c/Profile_avatar_placeholder_large.png';
+    if (realAvatarRaw) {
+        if (realAvatarRaw.startsWith('http') || realAvatarRaw.startsWith('blob')) {
+            displayAvatar = realAvatarRaw;
+        } else {
+            // SillyTavern 기본 캐릭터 폴더 경로 추정
+            displayAvatar = `/characters/${realAvatarRaw}`;
+        }
+    }
+
+    // [Fix 2] 저장된 연락처 매칭 시도 (이름 기반 검색)
+    // 연락처가 있으면 '내가 저장한 별명/사진'을 쓰고, 없으면 '원본 정보'를 씀
+    let contactId = null;
+    let contact = phoneState.contacts.find(c => c.name === realName);
+
+    if(contact) {
+        contactId = contact.id;
+        // 연락처에 저장된 정보 덮어쓰기
+        if(contact.avatar) displayAvatar = contact.avatar;
+    }
+
+    // [Fix 3] UI에 정보 적용 (이제 Unknown 안 뜸!)
+    // 연락처에 없어도 realName(원본 이름)을 표시함
+    $('#incoming-name').text(contact ? contact.name : realName);
+    $('#incoming-avatar').attr('src', displayAvatar);
+
+    // 폰 열기
+    if(!isPhoneOpen) togglePhone();
+    $('.phone-app').removeClass('active');
+    $('#app-incoming').addClass('active');
+
+    isRinging = true;
+
+    // 30초 타이머 시작 (부재중 처리)
+    if(incomingCallTimer) clearTimeout(incomingCallTimer);
+    incomingCallTimer = setTimeout(() => {
+        handleIncomingAction('missed', contactId, realName); // contactId가 없으면 realName이라도 넘김
+    }, 30000); // 30초
+};
+
+
+// 4. 수신/거절/부재중 액션 처리
+/* [수정됨] 수신/거절/부재중 처리 (이름 기억 강화판) */
+window.handleIncomingAction = function(action, contactIdArg = null, charNameArg = "") {
+    if(incomingCallTimer) clearTimeout(incomingCallTimer);
+    incomingCallTimer = null;
+    isRinging = false;
+
+    // 화면에 떠있는 정보 긁어오기 (이게 제일 정확함)
+    const currentName = $('#incoming-name').text() || charNameArg || "Unknown";
+    const currentAvatar = $('#incoming-avatar').attr('src') || "";
+    const contactId = contactIdArg; // 저장 안 된 놈이면 null일 것임.
+
+    // A. 부재중 / B. 거절
+    if (action === 'missed' || action === 'decline') {
+        const statusText = (action === 'missed') ? 'Missed Call' : 'Declined';
+        $('#incoming-status').text(statusText);
+
+        addHiddenLog('System', `[📞 Call ${statusText}]`);
+        // 기록 남길 때 화면에 있던 이름을 그대로 씀 (Unknown 방지)
+        recordHistory('missed', contactId, currentName);
+
+        setTimeout(() => {
+            $('#app-incoming').removeClass('active');
+            goHome();
+        }, 1500);
+    }
+
+    // C. 수신 (Accept)
+    else if (action === 'accept') {
+        const defaultImg = 'https://upload.wikimedia.org/wikipedia/commons/7/7c/Profile_avatar_placeholder_large.png';
+        const displayAvatar = (currentAvatar && currentAvatar !== "") ? currentAvatar : defaultImg;
+
+        // 화면 전환
+        $('#app-incoming').removeClass('active');
+        $('.phone-app').removeClass('active');
+        $('#app-calling').addClass('active');
+
+        // 통화 화면 세팅
+        $('#call-avatar').attr('src', displayAvatar);
+        $('#call-name').text(currentName);
+        $('#call-status').text('Connected').css('color', '#4ade80');
+        $('.call-avatar').css('animation-play-state', 'running');
+        $('#call-message-area').hide().text('');
+        $('#call-user-input-area').show();
+        $('#call-input-text').val('').focus();
+
+        // ★★★ [핵심] 통화 가방(Context)에 이름표와 사진을 넣어둠! ★★★
+        currentCallContext = {
+            contactId: contactId, // 없으면 null
+            displayName: currentName, // 화면에 떴던 그 이름!
+            displayAvatar: displayAvatar,
+            history: [],
+            active: true
+        };
+
+        addHiddenLog('System', `[📞 Call Accepted]`);
+        console.log("Call Connected. Input ready.");
+    }
+};
+
+
+function recordHistory(type, cId, cName) {
+    if (!phoneState.callHistory) phoneState.callHistory = [];
+
+    // 이름이 Unknown으로 들어오면 현재 채팅창의 캐릭터 이름을 가져옵니다.
+    if (!cName || cName === 'Unknown') {
+        const context = getContext();
+        if (context.characters && context.characters[context.characterId]) {
+            cName = context.characters[context.characterId].name;
+        }
+    }
+
+    phoneState.callHistory.push({
+        contactId: cId || 'unknown',
+        name: cName || 'Unknown',
+        type: type,
+        timestamp: Date.now()
+    });
+    saveChatData();
+}
