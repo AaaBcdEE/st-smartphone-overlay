@@ -31,19 +31,38 @@
 #st-phone-overlay {
     position: fixed; bottom: 20px; right: 20px;
     width: var(--phone-w); height: var(--phone-h);
+    max-height: calc(100vh - 40px); /* 이건 이전 질문에서 추가한 코드 */
     z-index: 20000;
     transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     color: var(--ph-text-color);
+
+    /* [여기 추가!] 빈 껍데기는 클릭을 통과시킴 */
+    pointer-events: none;
 }
-.phone-hidden { transform: translateY(150px) scale(0.8); opacity: 0; pointer-events: none; }
+
+
+/* [수정!] 애니메이션이 끝나면 투명인간이 아니라 아예 '사라짐(hidden)' 상태로 변경 */
+.phone-hidden {
+    transform: translateY(150px) scale(0.8);
+    opacity: 0;
+    pointer-events: none !important;
+    visibility: hidden;
+    /* 투명도 변하는 동안은 공간 유지하다가 다 변하면(0.3s 뒤에) 사라짐 */
+    transition: transform 0.4s, opacity 0.3s, visibility 0s 0.3s;
+}
+
 
 .phone-bezel {
+    /* [여기 추가!] 실제로 폰이 보이는 부분은 다시 클릭 가능하게 켬 */
+    pointer-events: auto;
+
     width: 100%; height: 100%; background: #000;
     border-radius: 56px; border: 6px solid #1a1a1a;
     box-shadow: 0 0 0 2px #444, 0 25px 50px -12px rgba(0,0,0,0.8), inset 0 0 0 4px #000;
     box-sizing: border-box; overflow: hidden; position: relative;
 }
+
 .phone-screen {
     width: 100%; height: 100%; background-color: #000;
     background-size: cover; background-position: center;
@@ -521,3 +540,52 @@ textarea.settings-input { width: 100%; background: var(--ph-input-bg); color: va
 .recent-type { font-size: 13px; color: #888; display:flex; align-items:center; gap:5px;}
 .recent-type.missed { color: #ff3b30; }
 .recent-time { font-size: 14px; color: #666; }
+
+/* =========================================================================
+   [긴급 재수정] 테마 색상 침범 방지 & 앱 아이콘 배경 복구
+   이 코드는 실리태번 테마의 색상 간섭은 막고, 앱 아이콘의 배경색은 되살립니다.
+   ========================================================================= */
+
+/* 1. 사라진 앱 아이콘의 '네모난 배경색(그라데이션)'들을 강제로 되살림 (무조건 표시!) */
+#st-phone-overlay .camera-bg { background: linear-gradient(135deg, #d4d4d8 0%, #71717a 100%) !important; }
+#st-phone-overlay .album-bg { background: linear-gradient(135deg, #fbbf24 0%, #ea580c 100%) !important; }
+#st-phone-overlay .message-bg { background: linear-gradient(135deg, #4ade80 0%, #16a34a 100%) !important; }
+#st-phone-overlay .settings-bg { background: linear-gradient(135deg, #94a3b8 0%, #475569 100%) !important; }
+#st-phone-overlay .contacts-bg { background: linear-gradient(135deg, #81c784 0%, #2e7d32 100%) !important; }
+#st-phone-overlay .phone-app-bg { background: linear-gradient(135deg, #34c759 0%, #30b34d 100%) !important; }
+
+/* 2. 앱 아이콘 속 '흰색 그림'은 테마가 뭐든간에 무조건 흰색으로 고정 */
+#st-phone-overlay .icon-bg i,
+#st-phone-overlay .msg-send-btn i {
+    color: #ffffff !important; /* 아이콘은 흰색 */
+    background: transparent !important; /* 아이콘 글자 뒤에 색칠 금지 */
+    -webkit-text-fill-color: #ffffff !important; /* 혹시 모를 웹킷 속성 방어 */
+}
+
+/* 3. 그 외의 일반 버튼 아이콘들(뒤로가기, 하단 탭 등)은 원래 의도한 색상(파란색 or 회색)을 따르게 함 */
+#st-phone-overlay i:not(.icon-bg i) {
+    /* 부모가 지정한 색깔(파란색 등)을 따라가라 */
+    color: inherit !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+}
+
+/* 4. 뒤로가기 버튼 등 핵심 UI 색상 고정 (테마가 핑크색으로 바꾸는 것 방지) */
+#st-phone-overlay .back-btn { color: var(--ph-icon-color) !important; }
+#st-phone-overlay .settings-action { color: var(--ph-icon-color) !important; }
+#st-phone-overlay .phone-nav-item.active { color: var(--ph-icon-color) !important; }
+#st-phone-overlay .contacts-bg { background: linear-gradient(135deg, #a855f7 0%, #7e22ce 100%) !important; } /* 연락처 보라색 복구 */
+
+/* 5. 텍스트 상자나 버튼이 이상해지지 않게 리셋 */
+#st-phone-overlay button,
+#st-phone-overlay input,
+#st-phone-overlay textarea {
+    box-shadow: none !important;
+    text-shadow: none !important;
+}
+
+/* 6. 전체 글씨색은 우리가 정한 폰 테마색 유지 */
+#st-phone-overlay {
+    color: var(--ph-text-color) !important;
+}
